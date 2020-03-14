@@ -483,9 +483,8 @@ def get_screen(x_left, y_top, x_right, y_bot):
     y_bot = int(y_bot)
     # print("grabbing screen" + str((x_left, y_top, x_right, y_bot)))
     screen = array(ImageGrab.grab(bbox=(x_left, y_top, x_right, y_bot)))
-
     screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-    cv2.imshow('window',screen)
+    cv2.imshow('Screen',screen)
     return screen
 
 
@@ -724,7 +723,6 @@ def filter_blue(image=None, testing=False):
             hsv = image.copy()
         # converting from BGR to HSV color space
         hsv = cv2.cvtColor(hsv, cv2.COLOR_BGR2HSV)
-        # cv2.imshow('hsv',hsv)
         # filter Elite UI orange
         filtered = cv2.inRange(hsv, array([0, 0, 200]), array([180, 100, 255]))
         if testing:
