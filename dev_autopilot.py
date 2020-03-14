@@ -27,7 +27,6 @@
 
 import sys
 from sys import platform
-import datetime
 from os import environ, listdir
 from os.path import join, isfile, getmtime, abspath
 from json import loads
@@ -39,11 +38,10 @@ import pyscreenshot as ImageGrab
 from datetime import datetime
 from xml.etree.ElementTree import parse
 import cv2 # see reference 2
-from src.directinput import * # see reference 5
 from pyautogui import size# see reference 6
 import logging
 import colorlog
-import numpy as np
+import subprocess
 
 
 # In[182]:
@@ -379,6 +377,13 @@ for key in keys_to_obtain:
 
 # In[194]:
 
+# Actuals Functions
+
+def PressKey(Key):
+    subprocess.call(["xdotool", "keydown", str(Key)])
+
+def ReleaseKey(Key):
+    subprocess.call(["xdotool", "keyup", str(Key)])
 
 def send(key, hold=None, repeat=1, repeat_delay=None, state=None):
 
