@@ -7,17 +7,17 @@
 # ## References
 
 # Useful docs / articles / etc
-#   
+#
 #   1 - [A Python wrapper around AHK](https://pypi.org/project/ahk/)
-# 
+#
 #   2 - [OpenCV on Wheels](https://pypi.org/project/opencv-python/)
-# 
+#
 #   3 - [Autopilot for Elite Dangerous using OpenCV and thoughts on CV enabled bots in visual-to-keyboard loop](https://networkgeekstuff.com/projects/autopilot-for-elite-dangerous-using-opencv-and-thoughts-on-cv-enabled-bots-in-visual-to-keyboard-loop/)
-#   
+#
 #   4 - [Using PyInstaller to Easily Distribute Python Applications](https://realpython.com/pyinstaller-python/)
-#   
+#
 #   5 - [Direct Input to a Game - Python Plays GTA V](https://pythonprogramming.net/direct-input-game-python-plays-gta-v/)
-#   
+#
 #   6 - [Cross-platform GUI automation for human beings](https://pyautogui.readthedocs.io/en/latest/index.html)
 
 # ## Imports
@@ -26,6 +26,7 @@
 
 
 import sys
+from sys import platform
 import datetime
 from os import environ, listdir
 from os.path import join, isfile, getmtime, abspath
@@ -34,7 +35,7 @@ from math import degrees, atan
 from random import random
 from time import sleep
 from numpy import array, sum, where
-from PIL import ImageGrab
+import pyscreenshot as ImageGrab
 from datetime import datetime
 from xml.etree.ElementTree import parse
 import cv2 # see reference 2
@@ -42,6 +43,7 @@ from src.directinput import * # see reference 5
 from pyautogui import size# see reference 6
 import logging
 import colorlog
+import numpy as np
 
 
 # In[182]:
@@ -69,7 +71,7 @@ logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 handler.setFormatter(
-    colorlog.ColoredFormatter('%(log_color)s%(levelname)-8s%(reset)s %(white)s%(message)s', 
+    colorlog.ColoredFormatter('%(log_color)s%(levelname)-8s%(reset)s %(white)s%(message)s',
         log_colors={
             'DEBUG':    'fg_bold_cyan',
             'INFO':     'fg_bold_green',
@@ -98,10 +100,19 @@ logging.info('\n'+200*'-'+'\n'+'---- AUTOPILOT DATA '+180*'-'+'\n'+200*'-')
 
 # In[185]:
 
+if platform == "linux" or platform == "linux2":
+    path_logs = "/home/speed/.steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous"
+    path_bindings = "/home/speed/.steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Local Settings/Application Data/Frontier Developments/Elite Dangerous/Options/Bindings"
+elif platform == "darwin":
+    path_logs = "mac path i dunno"
+    path_bindings = "mac path i dunno"
+elif platform == "win32":
+    path_logs = environ['USERPROFILE'] + "\Saved Games\Frontier Developments\Elite Dangerous"
+    path_bindings = environ['LOCALAPPDATA'] + "\Frontier Developments\Elite Dangerous\Options\Bindings"
 
 RELEASE = 'v19.05.15-alpha-18'
-PATH_LOG_FILES = None
-PATH_KEYBINDINGS = None
+PATH_LOG_FILES = path_logs
+PATH_KEYBINDINGS = path_bindings
 KEY_MOD_DELAY = 0.010
 KEY_DEFAULT_DELAY = 0.200
 KEY_REPEAT_DELAY = 0.100
@@ -126,15 +137,14 @@ logging.info('SCREEN_HEIGHT='+str(SCREEN_HEIGHT))
 # In[186]:
 
 
-def get_latest_log(path_logs=None):
+def get_latest_log(path_logs):
     """Returns the full path of the latest (most recent) elite log file (journal) from specified path"""
-    if not path_logs:
-        path_logs = environ['USERPROFILE'] + "\Saved Games\Frontier Developments\Elite Dangerous"
     list_of_logs = [join(path_logs, f) for f in listdir(path_logs) if isfile(join(path_logs, f)) and f.startswith('Journal.')]
     if not list_of_logs:
         return None
     latest_log = max(list_of_logs, key=getmtime)
     return latest_log
+
 
 
 # In[187]:
@@ -167,41 +177,41 @@ def ship():
     with open(latest_log, encoding="utf-8") as f:
         for line in f:
             log = loads(line)
-            
+
             # parse data
             try:
                 # parse ship status
                 log_event = log['event']
-                
+
                 if log_event == 'StartJump':
                     ship['status'] = str('starting_'+log['JumpType']).lower()
-                    
+
                 elif log_event == 'SupercruiseEntry' or log_event == 'FSDJump':
                     ship['status'] = 'in_supercruise'
-                    
+
                 elif log_event == 'SupercruiseExit' or log_event == 'DockingCancelled'                  or (log_event == 'Music' and ship['status'] == 'in_undocking')                  or (log_event == 'Location' and log['Docked'] == False):
                     ship['status'] = 'in_space'
-                    
+
                 elif log_event == 'Undocked':
 #                     ship['status'] = 'starting_undocking'
                     ship['status'] = 'in_space'
-                    
+
                 elif log_event == 'DockingRequested':
                     ship['status'] = 'starting_docking'
-                    
+
                 elif log_event == "Music" and log['MusicTrack'] == "DockingComputer":
                     if ship['status'] == 'starting_undocking':
                         ship['status'] = 'in_undocking'
                     elif ship['status'] == 'starting_docking':
                         ship['status'] = 'in_docking'
-                
+
                 elif log_event == 'Docked':
                     ship['status'] = 'in_station'
-                    
+
                 # parse ship type
                 if log_event == 'LoadGame' or log_event == 'Loadout':
                     ship['type'] = log['Ship']
-                    
+
                 # parse fuel
                 if 'FuelLevel' in log and ship['type'] != 'TestBuggy':
                     ship['fuel_level'] = log['FuelLevel']
@@ -216,19 +226,19 @@ def ship():
                     ship['fuel_percent'] = round((ship['fuel_level'] / ship['fuel_capacity'])*100)
                 else:
                     ship['fuel_percent'] = 10
-                    
+
                 # parse scoop
                 if log_event == 'FuelScoop' and ship['time'] < 10 and ship['fuel_percent'] < 100:
                     ship['is_scooping'] = True
                 else:
                     ship['is_scooping'] = False
-                    
+
                 # parse location
                 if (log_event == 'Location' or log_event == 'FSDJump') and 'StarSystem' in log:
                     ship['location'] = log['StarSystem']
                 if 'StarClass' in log:
                     ship['star_class'] = log['StarClass']
-                    
+
                 # parse target
                 if log_event == 'FSDTarget':
                     if log['Name'] == ship['location']:
@@ -238,8 +248,8 @@ def ship():
                 elif log_event == 'FSDJump':
                     if ship['location'] == ship['target']:
                         ship['target'] = None
-                
-                    
+
+
             # exceptions
             except Exception as e:
                 logging.exception("Exception occurred")
@@ -261,9 +271,7 @@ logging.debug('ship='+str(ship()))
 # In[190]:
 
 
-def get_latest_keybinds(path_bindings=None):
-    if not path_bindings:
-        path_bindings = environ['LOCALAPPDATA'] + "\Frontier Developments\Elite Dangerous\Options\Bindings"
+def get_latest_keybinds(path_bindings):
     list_of_bindings = [join(path_bindings, f) for f in listdir(path_bindings) if isfile(join(path_bindings, f))]
     if not list_of_bindings:
         return None
@@ -274,7 +282,7 @@ def get_latest_keybinds(path_bindings=None):
 # In[191]:
 
 
-logging.info("get_latest_keybinds="+str(get_latest_keybinds()))
+logging.info("get_latest_keybinds="+str(get_latest_keybinds(PATH_KEYBINDINGS)))
 
 
 # ### Extract necessary keys
@@ -314,48 +322,37 @@ def get_bindings(keys_to_obtain=keys_to_obtain):
         'Key_LeftAlt':'LAlt',
         'Key_RightAlt':'RAlt',
         'Key_LeftControl':'LControl',
-        'Key_RightControl':'RControl'
+        'Key_RightControl':'RControl',
+        'Key_Backspace':'0xff08',
+        'Key_UpArrow':'0x08fc',
+        'Key_DownArrow':'0x08fe',
+        'Key_LeftArrow':'0x08fb',
+        'Key_RightArrow':'0x08fd'
     }
-    
-    latest_bindings = get_latest_keybinds()
+
+    latest_bindings = get_latest_keybinds(PATH_KEYBINDINGS)
     bindings_tree = parse(latest_bindings)
     bindings_root = bindings_tree.getroot()
-    
+
     for item in bindings_root:
         if item.tag in keys_to_obtain:
             key = None
-            mod = None      
+            mod = None
             # Check primary
             if item[0].attrib['Device'].strip() == "Keyboard":
                 key = item[0].attrib['Key']
-                if len(item[0]) > 0:
-                    mod = item[0][0].attrib['Key']
             # Check secondary (and prefer secondary)
             if item[1].attrib['Device'].strip() == "Keyboard":
                 key = item[1].attrib['Key']
-                if len(item[1]) > 0:
-                    mod = item[1][0].attrib['Key']
             # Adequate key to SCANCODE dict standard
             if key in convert_to_direct_keys:
                 key = convert_to_direct_keys[key]
             elif key is not None:
                 key = key[4:]
-            # Adequate mod to SCANCODE dict standard
-            if mod in convert_to_direct_keys:
-                mod = convert_to_direct_keys[mod]
-            elif mod is not None:
-                mod = mod[4:]
             # Prepare final binding
             binding = None
             if key is not None:
-                binding = {}
-                binding['pre_key'] = 'DIK_'+key.upper()
-                binding['key'] = SCANCODE[binding['pre_key']]
-                if mod is not None:
-                    binding['pre_mod'] = 'DIK_'+mod.upper()
-                    binding['mod'] = SCANCODE[binding['pre_mod']]
-            if binding is not None:
-                direct_input_keys[item.tag] = binding
+                direct_input_keys[item.tag] = key
 #             else:
 #                 logging.warning("get_bindings_<"+item.tag+">= does not have a valid keyboard keybind.")
 
@@ -384,21 +381,24 @@ for key in keys_to_obtain:
 
 
 def send(key, hold=None, repeat=1, repeat_delay=None, state=None):
+
+    print("sending key: " + str(key))
+
     global KEY_MOD_DELAY, KEY_DEFAULT_DELAY, KEY_REPEAT_DELAY
-    
+
     if key is None:
         logging.warning('SEND=NONE !!!!!!!!')
         return
-    
+
     logging.debug('send=key:'+str(key)+',hold:'+str(hold)+',repeat:'+str(repeat)+',repeat_delay:'+str(repeat_delay)+',state:'+str(state))
     for i in range(repeat):
-        
+
         if state is None or state == 1:
             if 'mod' in key:
-                PressKey(key['mod'])
+                PressKey(key)
                 sleep(KEY_MOD_DELAY)
 
-            PressKey(key['key'])
+            PressKey(key)
 
         if state is None:
             if hold:
@@ -407,12 +407,12 @@ def send(key, hold=None, repeat=1, repeat_delay=None, state=None):
                 sleep(KEY_DEFAULT_DELAY)
 
         if state is None or state == 0:
-            ReleaseKey(key['key'])
+            ReleaseKey(key)
 
             if 'mod' in key:
                 sleep(KEY_MOD_DELAY)
-                ReleaseKey(key['mod'])
-        
+                ReleaseKey(key)
+
         if repeat_delay:
             sleep(repeat_delay)
         else:
@@ -477,10 +477,17 @@ def clear_input(to_clear=None):
 
 
 def get_screen(x_left, y_top, x_right, y_bot):
+    x_left = int(x_left)
+    y_top = int(y_top)
+    x_right = int(x_right)
+    y_bot = int(y_bot)
+    # print("grabbing screen" + str((x_left, y_top, x_right, y_bot)))
     screen = array(ImageGrab.grab(bbox=(x_left, y_top, x_right, y_bot)))
+
     screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+    cv2.imshow('window',screen)
     return screen
-    
+
 
 
 # ### HSV slider tool
@@ -717,6 +724,7 @@ def filter_blue(image=None, testing=False):
             hsv = image.copy()
         # converting from BGR to HSV color space
         hsv = cv2.cvtColor(hsv, cv2.COLOR_BGR2HSV)
+        # cv2.imshow('hsv',hsv)
         # filter Elite UI orange
         filtered = cv2.inRange(hsv, array([0, 0, 200]), array([180, 100, 255]))
         if testing:
@@ -1019,22 +1027,22 @@ def align():
     if not (ship()['status'] == 'in_supercruise' or ship()['status'] == 'in_space'):
         logging.error('align=err1')
         raise Exception('align error 1')
-    
+
     logging.debug('align= speed 100')
     send(keys['SetSpeed100'])
-    
+
     logging.debug('align= avoid sun')
     while sun_percent() > 5:
         send(keys['PitchUpButton'], state=1)
     send(keys['PitchUpButton'], state=0)
-    
+
     logging.debug('align= find navpoint')
     off = get_navpoint_offset()
     while not off:
         send(keys['PitchUpButton'], state=1)
         off = get_navpoint_offset()
     send(keys['PitchUpButton'], state=0)
-    
+
     logging.debug('align= crude align')
     close = 3
     close_a = 18
@@ -1067,12 +1075,12 @@ def align():
                 return
             off = get_navpoint_offset(last=off)
             ang = x_angle(off)
-            
+
         off = get_navpoint_offset(last=off)
         ang = x_angle(off)
 
     logging.debug('align= fine align')
-    sleep(0.5)    
+    sleep(0.5)
     close = 50
     hold_pitch = 0.200
     hold_yaw = 0.400
@@ -1085,7 +1093,7 @@ def align():
     if not off:
         return
     while (off['x'] > close) or           (off['x'] < -close) or           (off['y'] > close) or           (off['y'] < -close):
-        
+
         if off['x'] > close:
             send(keys['YawRightButton'], hold=hold_yaw)
         if off['x'] < -close:
@@ -1094,10 +1102,10 @@ def align():
             send(keys['PitchUpButton'], hold=hold_pitch)
         if off['y'] < -close:
             send(keys['PitchDownButton'], hold=hold_pitch)
-            
+
         if ship()['status'] == 'starting_hyperspace':
             return
-        
+
         for i in range(5):
             new = get_destination_offset()
             if new:
@@ -1106,7 +1114,7 @@ def align():
             sleep(0.25)
         if not off:
             return
-    
+
     logging.debug('align=complete')
 
 
@@ -1148,7 +1156,7 @@ def jump():
             logging.debug('jump=complete')
             return True
     logging.error('jump=err2')
-    raise Exception("jump failure")    
+    raise Exception("jump failure")
 
 
 # In[230]:
@@ -1170,7 +1178,7 @@ def refuel(refuel_threshold=33):
         logging.error('refuel=err1')
         return False
         raise Exception('not ready to refuel')
-        
+
     if ship()['fuel_percent'] < refuel_threshold and ship()['star_class'] in scoopable_stars:
         logging.debug('refuel= start refuel')
         send(keys['SetSpeed100'])
@@ -1260,19 +1268,19 @@ def position(refueled_multiplier=1):
 # ## Autopilot main
 
 # ### status reference
-# 
+#
 # 'in-station'
-# 
+#
 # 'in-supercruise'
-# 
+#
 # 'in-space'
-# 
+#
 # 'starting-undocking'
-# 
+#
 # 'in-undocking'
-# 
+#
 # 'starting-docking'
-# 
+#
 # 'in-docking'
 
 # In[236]:
@@ -1306,4 +1314,3 @@ def autopilot():
 
 # sleep(3)
 # autopilot()
-
