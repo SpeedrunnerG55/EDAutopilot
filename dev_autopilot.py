@@ -389,6 +389,12 @@ def get_screen(x_left, y_top, x_right, y_bot):
     # print("grabbing screen" + str((x_left, y_top, x_right, y_bot)))
     screen = array(ImageGrab.grab(bbox=(x_left, y_top, x_right, y_bot)))
     screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+
+    test = cv2.imread(resource_path("Cold Osha.PNG"))
+    test = cv2.resize(test,(500,500))
+    print(test)
+    cv2.imshow('Screen',test)
+
     return screen
 
 
