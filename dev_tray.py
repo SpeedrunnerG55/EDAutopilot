@@ -1,19 +1,8 @@
-from pystray import Icon, MenuItem, Menu
-from PIL import Image # big
-from dev_autopilot import autopilot, resource_path, get_bindings, clear_input, set_scanner, RELEASE
+from dev_autopilot import autopilot,  get_bindings, clear_input
 import threading
 import kthread
-import keyboard
 
 STATE = 0
-
-def setup(icon):
-    icon.visible = True
-
-def exit_action():
-    stop_action()
-    icon.visible = False
-    icon.stop()
 
 def start_action():
     stop_action()
@@ -25,54 +14,37 @@ def stop_action():
             thread.kill()
     clear_input(get_bindings())
 
-def set_state(v):
-    def inner(icon, item):
-        global STATE
-        STATE = v
-        set_scanner(STATE)
-    return inner
+from pynput import keyboard
 
-def get_state(v):
-    def inner(item):
-        return STATE == v
-    return inner
+def on_press(key):
+    try:
+        if key == keyboard.Key.home:
+            print('start action')
+            start_action()
+        if key == keyboard.Key.end:
+            print('stop action')
+            stop_action()
+    except AttributeError:
+        print('special key {0} pressed'.format(
+            key))
 
-def tray():
-    global icon, thread
-    icon = None
-    thread = None
+def on_release(key):
+    print('{0} released'.format(key))
+    if key == keyboard.Key.esc:
+        # Stop listener
+        return False
 
-    name = 'ED - Autopilot'
-    icon = Icon(name=name, title=name)
-    logo = Image.open(resource_path('src/logo.png'))
-    icon.icon = logo
+# Collect events until released
+with keyboard.Listener(
+        on_press=on_press,
+        on_release=on_release) as listener:
+    listener.join()
 
-    icon.menu = Menu(
-        MenuItem(
-            'Scan Off',
-            set_state(0),
-            checked=get_state(0),
-            radio=True
-        ),
-        MenuItem(
-            'Scan on Primary Fire',
-            set_state(1),
-            checked=get_state(1),
-            radio=True
-        ),
-        MenuItem(
-            'Scan on Secondary Fire',
-            set_state(2),
-            checked=get_state(2),
-            radio=True
-        ),
-        MenuItem('Exit', lambda : exit_action())
-    )
-
-    keyboard.add_hotkey('home', start_action)
-    keyboard.add_hotkey('end', stop_action)
-
-    icon.run(setup)
+# ...or, in a non-blocking fashion:
+listener = keyboard.Listener(
+    on_press=on_press,
+    on_release=on_release)
+listener.start()
 
 if __name__ == '__main__':
     tray()
