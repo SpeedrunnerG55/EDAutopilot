@@ -1,58 +1,38 @@
-from dev_autopilot import *
-from numpy import array
+
+from immageProcessing import LoadHSVs , createWindows, createSliderWindow
+from functions import dock, undock
+from calculations import sun_percent
 from time import sleep
-import mss
-import cv2 # see reference 2
-#
+from readLogs import printSytemInformation, STAR_CLASS
+from programInfo import showInfo
+
+from offsets import get_navpoint_offset, get_destination_offset
+
+def test(functions):
+    while(True):
+        print(function())
+
+def hsv_slider(functions,output=False):
+    createWindows()
+    while(True):
+        for function in functions:
+            if(output):
+                print(function(testing=True))
+            else:
+                function(testing=True)
+
+
+
+# for i in range(5):
+#     print("starting in {}".format(5 - i))
+#     sleep(1)
+
+# dock()
 
 printSytemInformation()
 
-
-# while(True):
-#     screen = get_screen(1800,100,2600,900)
-#     showHSV('hist',screen)
-#     cv2.imshow('screen',screen)
-#     cv2.waitKey(1)
-
-# logging.info("CountDown")
-# max = 4
-# for i in range(1,max):
-#     logging.info(max - i)
-#     sleep(1);
-
-# while(True):
-#     tineRadio()
-
-# while(True):
-#     getSpectrumOffset()
-
-# clear_input(get_bindings())
-
-#
-
-left = 0
-top = 0
-right = 1600
-bottom = 600
-
-# img = cv2.imread(resource_path("examples/altitude.png"))
-# getEntryOffset(img)
-while(True):
-    get_navpoint_offset()
-    cv2.waitKey(1)
-
-
-#     # get_destination_offset()
-#     get_navpoint_offset()
-
-
-#
-# consoleHeadder("THIS IS A TEST")
-# sleep(1)
-# consoleHeadder("THIS IS OLNY A TEST")
-# sleep(1)
-#
-# discoveryScan()
-#
-# while(True):
-#     getSpectrumOffset();
+print(STAR_CLASS)
+LoadHSVs()
+# createSliderWindow('sun',1800,600)
+# test(sun_percent)
+hsv_slider([get_navpoint_offset,get_destination_offset])
