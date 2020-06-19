@@ -133,15 +133,18 @@ convert_to_direct_keys = {
     'SemiColon':';',
     'Slash':'/',
     'Space':' ',
-    'F1':'f1',
-    'F2':'f2',
-    'F3':'f3',
-    'F4':'f4',
-    'F5':'f5',
-    'F6':'f6',
-    'F7':'f7',
-    'F8':'f8',
-    'F9':'f9'
+    'F1':Key.f1,
+    'F2':Key.f2,
+    'F3':Key.f3,
+    'F4':Key.f4,
+    'F5':Key.f5,
+    'F6':Key.f6,
+    'F7':Key.f7,
+    'F8':Key.f8,
+    'F9':Key.f9,
+    'F9':Key.f10,
+    'F9':Key.f11,
+    'F9':Key.f12
 }
 
 
